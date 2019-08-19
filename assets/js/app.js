@@ -1,161 +1,105 @@
-// read csv and plot graphs using svg .
-
-// Scatter  plot.
-
-// Chart area
-var svgWidth = 900;
+var svgWidth = 960;
 var svgHeight = 500;
 
-//Define Margins.
 var margin = {
   top: 20,
-  right: 100,
-  bottom: 70,
+  right: 40,
+  bottom: 60,
   left: 100
 };
 
-// Chart Area  minus Margins.
-var chartHeight = svgHeight - margin.top - margin.bottom;
-var chartWidth  = svgWidth - margin.left - margin.right;
+var width = svgWidth - margin.left - margin.right;
+var height = svgHeight - margin.top - margin.bottom;
 
-// create svg container and move contents over by the margins using transform/translate.
-var svg = d3
-    .select('#scatter')
-    .append('svg')
-    .attr('width', svgWidth)
-    .attr('height', svgHeight)
-    .append('g')
-    .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+// Create an SVG wrapper, append an SVG group that will hold our chart, and shift the latter by left and top margins.
+var svg = d3.select("#scatter")
+  .append("svg")
+  .attr("width", svgWidth)
+  .attr("height", svgHeight);
 
 var chartGroup = svg.append("g")
-// Move contents over beside the Margins
-// .attr("transform", `translate(${margin.left}, ${margin.top})`);
+  .attr("transform", `translate(${margin.left}, ${margin.top})`);
 
-// Read from data.csv
-d3.csv("../Web-d3js-html5/assets/data/data.csv", function(err, brfssdata) {
-    //d3.csv("/data/data.csv", function(err, brfssdata) {
-    if (err) throw err;
-    //if (error) return console.warn(error);
-    console.log(brfssdata)
+  //Import CSV
+  d3.csv("data.csv")
+  .then(function(data) {
+
+    // Step 1: Parse Data/Cast as numbers
+    // ==============================
+    data.forEach(function(data) {
+      data.obesity = +data.obesity;
+      data.smokes = +data.smokes;
+    });
+
+    // Step 2: Create scale functions
+    // ==============================
+    var xLinearScale = d3.scaleLinear()
+      .domain([20, d3.max(data, d => d.smokes)])
+      .range([0, width]);
+
+    var yLinearScale = d3.scaleLinear()
+      .domain([0, d3.max(data, d => d.obesity)])
+      .range([height, 0]);
     
-    //loop through the csv file & .
-    for (var i = 0; i < brfssdata.length; i++) {
-        console.log(i, brfssdata[i].state, brfssdata[i].poverty, brfssdata[i].healthcare );
-        console.log(i, brfssdata[i].obesity, brfssdata[i].income  );
-    }
+    // Step 3: Create axis functions
+    // ==============================
+    var bottomAxis = d3.axisBottom(xLinearScale);
+    var leftAxis = d3.axisLeft(yLinearScale);
 
-    brfssdata.forEach(function(data) {
-        data.poverty = +data.poverty;
-        data.healthcare = +data.healthcare;
+    // Step 4: Append Axes to the chart
+    // ==============================
+    chartGroup.append("g")
+      .attr("transform", `translate(0, ${height})`)
+      .call(bottomAxis);
+
+    chartGroup.append("g")
+      .call(leftAxis);
+
+    // Step 5: Create Circles
+    // ==============================
+    var circlesGroup = chartGroup.selectAll("circle")
+    .data(data)
+    .enter()
+    .append("circle")
+    .attr("cx", d => xLinearScale(d.smokes))
+    .attr("cy", d => yLinearScale(d.obesity))
+    .attr("r", "15")
+    .attr("fill", "pink")
+    .attr("opacity", ".5");
+
+    // Step 6: Initialize tool tip
+    // ==============================
+    var toolTip = d3.tip()
+      .attr("class", "tooltip")
+      .offset([80, -60])
+      .html(function(d) {
+        return (`${d.abbr}<br>Smokes: ${d.smokes}<br>Obesity: ${d.obesity}`);
+      });
+      //Step 7: Create tooltip in the chart
+      // ==============================
+      chartGroup.call(toolTip);
+  
+      // Step 8: Create event listeners to display and hide the tooltip
+      // ==============================
+      circlesGroup.on("click", function(data) {
+        toolTip.show(data, this);
       })
-  
-       // Functions to set scale y to chart height.
-      var yLinearScale = d3.scaleLinear().range([chartHeight, 0]);
-      // scale x to chart width.
-      var xLinearScale = d3.scaleLinear().range([0, chartWidth]);
-  
-      // Create Axis functions
-      var bottomAxis = d3.axisBottom(xLinearScale);
-      var leftAxis = d3.axisLeft(yLinearScale);
-  
-      // Scale the domain
-      xLinearScale.domain([8,
-          d3.max(brfssdata, function(data) {
-          return +data.poverty * 1.05;
-        }),
-      ]);
-
-      yLinearScale.domain([0,
-          d3.max(brfssdata, function(data) {
-          return +data.healthcare * 1.1;
-        }),
-      ]);
-  
-    
-      // Create tool tip
-      var toolTip = d3
-        .tip()
-        .attr('class', 'tooltip')
-        .offset([60, 15])
-
-        .html(function(data) {
-            var state = data.state;
-            var poverty = +data.poverty;
-            var healthcare = +data.healthcare;
-            return (
-            state + '<br> Poverty Percentage: ' + poverty + '<br> Lacks Healthcare Percentage: ' + healthcare
-            );
+        // onmouseout event
+        .on("mouseout", function(data, index) {
+          toolTip.hide(data);
         });
   
-      chartGroup.call(toolTip);
-      
-      // Generate Scatter Plot
-      chartGroup
-      .selectAll('circle')
-      .data(brfssdata)
-      .enter()
-      .append('circle')
-      .attr('cx', function(data, index) {
-        return xLinearScale(data.poverty);
-      })
-      .attr('cy', function(data, index) {
-        return yLinearScale(data.healthcare);
-      })
-      .attr('r', '16')
-      .attr('fill', 'lightgreen')
-      .attr('fill-opacity',0.6)
-      
-      // Display tooltip on mouseover. 
-      .on("mouseover",function(data) {
-        toolTip.show(data);
-      })
-      // Hide and Show on mouseout
-      .on("mouseout", function(data, index) {
-        toolTip.hide(data);
-      });
+      // Create axes labels
+      chartGroup.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 0 - margin.left + 40)
+        .attr("x", 0 - (height / 2))
+        .attr("dy", "1em")
+        .attr("class", "axisText")
+        .text("Smokes");
   
-      chartGroup
-        .append('g')
-        .attr('transform', `translate(0, ${chartHeight})`)
-        .call(bottomAxis);
-  
-      chartGroup.append('g').call(leftAxis);
-  
-      svg.selectAll(".dot")
-      .data(brfssdata)
-      .enter()
-      .append("text")
-      .text(function(data) { return data.abbr; })
-      .attr('x', function(data) {
-        return xLinearScale(data.poverty);
-      })
-      .attr('y', function(data) {
-        return yLinearScale(data.healthcare);
-      })
-      .attr("font-size", "10px")
-      .attr("fill", "black")
-      .style("text-anchor", "middle");
-  
-      chartGroup
-        .append('text')
-        .attr('transform', 'rotate(-90)')
-        .attr('y', 0 - margin.left + 40)
-        .attr('x', 0 - chartHeight / 2)
-        .attr('dy', '1em')
-        .attr('class', 'axisText')
-        .text('No Healthcare (%)');
-  
-      // x-axis labels
-      chartGroup
-        .append('text')
-        .attr(
-          'transform',
-          'translate(' + chartWidth / 2 + ' ,' + (chartHeight + margin.top + 40) + ')',
-        )
-        .attr('class', 'axisText')
-        .text('Poverty (%)');
-
-      //Event listeners with transitions for obesity vs income to be added. 
-
-
-})
+      chartGroup.append("text")
+        .attr("transform", `translate(${width / 2}, ${height + margin.top + 30})`)
+        .attr("class", "axisText")
+        .text("Obesity");
+    });
